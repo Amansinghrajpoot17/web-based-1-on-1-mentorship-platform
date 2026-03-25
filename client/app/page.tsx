@@ -6,16 +6,28 @@ export default function Home() {
   const[email,setemail]=useState("")
   const [password, setPassword] = useState("");
   const signup=async()=>{
-    const{error}=await supabase.auth.signUp({
+    
+    const{data, error}=await supabase.auth.signUp({
       email,
       password
     });
     if (error)  {
      alert (error?.message)
-    } else {
-      alert("check your email")
+     return;
+    } 
+    if(data.user){
+     ([
+      {
+        id:data.user.id,
+        email:data.user.email,
+        
+      },
+      
+      
+     ]);
     }
   }
+  
   const SignIN= async()=>{
     const{error}=await supabase.auth.signInWithPassword({
       email,
@@ -27,27 +39,44 @@ export default function Home() {
       alert("Login Successfully")
     }
   }
+  const [role, setrole]=useState("student")
   return(
-    <div className="p-10">
-      <h1 className="text xl mb-4">Auth</h1>
-      <form >
+    <div className="p-10 ">
+      
+      <h1 className="text-xl mb-4">Auth</h1>
+      <form 
+      onSubmit={(e)=>{
+        e.preventDefault()
+        signup();
+      }}
+      >
       <input className="border p-2 block mb-2"
       placeholder="email"
+      autoComplete="email"
       onChange={(e)=> setemail(e.target.value)} />
       <input className="border p-2 block mb-2"
       type="password"
+      placeholder="password"
+      autoComplete="current-password"
       onChange={(e)=>setPassword(e.target.value)} />
+      <div className="inline-flex space-x-4">
 <button 
-onClick={signup}
-className="bg-green-500 text-white px--4 py-2">Sign up</button>
 
- 
+className="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 border-b-4 border-blue-700 hover:border-blue-500 rounded">Sign up</button>
 <button
 onClick={SignIN}
-className="bg-blue-500 text-white px--4 py-2"
+className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 border-b-4 border-green-700 hover:border-green-500 rounded"
 >LOGIN</button>
-</form>
+<select className="border p-2 block mb-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" value={role} onChange={(e) => setrole(e.target.value)}>
+  <option value="student">Student</option>
+  <option value="mentor">Mentor</option>
+  
+</select>
+</div>
 
-    </div>
+</form>
+ 
+ </div>
   )
+
 }
