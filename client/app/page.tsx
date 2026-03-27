@@ -29,6 +29,7 @@ export default function Home() {
       alert(error.message)
     } else {
       alert("Login Successfully")
+      window.location.href="/dashboard"
     }
   }
   const [role, setrole]=useState("student")
