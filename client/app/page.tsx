@@ -15,20 +15,12 @@ export default function Home() {
      alert (error?.message)
      return;
     } 
-    if(data.user){
-     ([
-      {
-        id:data.user.id,
-        email:data.user.email,
-        
-      },
-      
-      
-     ]);
-    }
+    alert("check your email for the confirmation link")
   }
   
   const SignIN= async()=>{
+    console.log("sign-up clicked");
+    
     const{error}=await supabase.auth.signInWithPassword({
       email,
       password
@@ -61,9 +53,9 @@ export default function Home() {
       onChange={(e)=>setPassword(e.target.value)} />
       <div className="inline-flex space-x-4">
 <button 
-
+type="submit"
 className="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 border-b-4 border-blue-700 hover:border-blue-500 rounded">Sign up</button>
-<button
+<button type="button"
 onClick={SignIN}
 className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 border-b-4 border-green-700 hover:border-green-500 rounded"
 >LOGIN</button>
