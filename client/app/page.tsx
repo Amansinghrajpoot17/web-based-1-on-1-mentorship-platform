@@ -1,144 +1,162 @@
-"use client"
-import Image from "next/image";
-import React, {  useState } from "react";
+"use client";
+import React, { useState } from "react";
 import { supabase } from "@/app/lib/supabase";
+
 export default function AuthPage() {
-  const[isLogin, setIsLogin]=useState(true)
-  const[form, setForm]=useState({
-    name:"",
-    email:"",
-    password:""
+  const [isLogin, setIsLogin] = useState(true);
+  const [role, setRole] = useState("student");
+
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
   });
-  const handleChange=(e:React.ChangeEvent<HTMLInputElement>)=>{
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({
       ...form,
-      [e.target.name]:e.target.value,
+      [e.target.name]: e.target.value,
     });
   };
-  
-  const [role, setrole]=useState("")
-const handleSubmit= async()=>{
-  const{name, email,password}=form;
-  if (isLogin) {
-    const{error}= await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if(error){
-      return alert(error.message)
-    }
-      const {data: userData}=await supabase.auth.getUser()
-      const user=userData.user;
-      const{data,error:roleError}=await supabase.from("profiles").select("role").eq("id",user?.id).single();
-      if(roleError){
-        return alert(roleError.message)
-      }
-        setrole(data.role);
-        window.location.href="/dashboard";
-  } else {
-    const{data,error}=await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if(error){
-      return alert(error.message)
-    }
-  } 
 
-}
-return(
- <div className="min-h-screen flex">
-      
-      {/* LEFT SIDE */}
-      <div className="hidden md:flex w-1/2 bg-gradient-to-br from-indigo-600 to-purple-700 text-white flex-col justify-center items-center p-10">
-        <h1 className="text-4xl font-bold mb-4">MentorConnect</h1>
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const { name, email, password } = form;
+
+    if (isLogin) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) return alert(error.message);
+
+      window.location.href = "/dashboard";
+    } else {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) return alert(error.message);
+
+      // ✅ Insert role into profiles table
+      if (data.user) {
+        await supabase.from("profiles").insert([
+          {
+            id: data.user.id,
+            name,
+            role,
+            email,
+          },
+        ]);
+      }
+
+      alert("Signup successful! Now login.");
+      setIsLogin(true);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
+
+      {/* LEFT */}
+      <div className="hidden md:flex w-1/2 text-white flex-col justify-center items-center p-10">
+        <h1 className="text-5xl font-bold mb-4">MentorConnect</h1>
         <p className="text-lg opacity-80 text-center max-w-md">
           Connect with industry experts, learn faster, and grow your career 🚀
         </p>
-
-        <div className="mt-10 w-60 h-60 bg-white/10 rounded-full blur-2xl"></div>
       </div>
 
-      {/* RIGHT SIDE */}
-      <div className="flex w-full md:w-1/2 items-center justify-center bg-gray-100">
-        
-        <div className="backdrop-blur-lg bg-white/70 p-8 rounded-2xl shadow-2xl w-[380px]">
-          
+      {/* RIGHT */}
+      <div className="flex w-full md:w-1/2 items-center justify-center p-6">
+
+        <div className="bg-white/10 backdrop-blur-lg p-8 rounded-2xl shadow-2xl w-[380px] border border-white/20">
+
           {/* Toggle */}
-          <div className="flex mb-6 bg-gray-200 rounded-full p-1">
+          <div className="flex mb-6 bg-white/20 rounded-full p-1">
             <button
               onClick={() => setIsLogin(true)}
-              className={`w-1/2 py-2 rounded-full transition ${
-                isLogin ? "bg-indigo-600 text-white" : "text-gray-600"
+              className={`w-1/2 py-2 rounded-full ${
+                isLogin ? "bg-white text-indigo-600" : "text-white"
               }`}
             >
               Login
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`w-1/2 py-2 rounded-full transition ${
-                !isLogin ? "bg-indigo-600 text-white" : "text-gray-600"
+              className={`w-1/2 py-2 rounded-full ${
+                !isLogin ? "bg-white text-indigo-600" : "text-white"
               }`}
             >
               Sign Up
             </button>
           </div>
 
-          {/* Title */}
-          <h2 className="text-2xl font-semibold text-center mb-4">
-            {isLogin ? "Welcome Back 👋" : "Join the Platform 🚀"}
+          <h2 className="text-xl text-white text-center mb-4">
+            {isLogin ? "Welcome Back 👋" : "Create Account 🚀"}
           </h2>
 
-          {/* Role Selector */}
-          <div className="flex gap-2 mb-4">
+          {/* Role */}
+          <div className="flex gap-3 mb-4">
             {["student", "mentor"].map((r) => (
               <button
                 key={r}
-                onClick={() => setrole(r)}
-                className={`flex-1 py-2 rounded-full border text-sm transition ${
+                onClick={() => setRole(r)}
+                className={`flex-1 py-2 rounded-full text-sm ${
                   role === r
-                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                    : "border-gray-300 text-gray-600 hover:bg-gray-200"
+                    ? "bg-white text-indigo-600"
+                    : "bg-white/20 text-white"
                 }`}
               >
-                {r === "student" ? "🎓 Student" : "🧑‍🏫 Mentor"}
+                {r}
               </button>
             ))}
           </div>
 
           {/* Form */}
-          <form className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+
             {!isLogin && (
               <input
                 type="text"
+                name="name"
                 placeholder="Full Name"
-                className="border p-3 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none"
+                value={form.name}
+                onChange={handleChange}
+                className="p-3 rounded-lg bg-white/20 text-white placeholder-gray-300 outline-none"
               />
             )}
 
             <input
               type="email"
+              name="email"
               placeholder="Email"
-              className="border p-3 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none"
+              value={form.email}
+              onChange={handleChange}
+              className="p-3 rounded-lg bg-white/20 text-white placeholder-gray-300 outline-none"
             />
 
             <input
               type="password"
+              name="password"
               placeholder="Password"
-              className="border p-3 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none"
+              value={form.password}
+              onChange={handleChange}
+              className="p-3 rounded-lg bg-white/20 text-white placeholder-gray-300 outline-none"
             />
 
-            <button className="bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition font-medium shadow-md">
-              {isLogin ? "Login" : "Create Account"}
+            <button className="bg-white text-indigo-600 py-3 rounded-lg font-semibold">
+              {isLogin ? "Login" : "Sign Up"}
             </button>
           </form>
 
-          {/* Footer */}
-          <p className="text-center text-sm mt-4 text-gray-500">
-            {isLogin ? "New here?" : "Already registered?"}
+          <p className="text-center text-sm text-white mt-4">
+            {isLogin ? "Don't have an account?" : "Already have an account?"}
             <span
               onClick={() => setIsLogin(!isLogin)}
-              className="text-indigo-600 cursor-pointer ml-1 font-medium"
+              className="ml-1 underline cursor-pointer"
             >
               {isLogin ? "Sign Up" : "Login"}
             </span>
