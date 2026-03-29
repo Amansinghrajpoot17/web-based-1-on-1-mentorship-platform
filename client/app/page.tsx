@@ -1,8 +1,11 @@
 "use client";
 import React, { useState } from "react";
 import { supabase } from "@/app/lib/supabase";
+import { useRouter } from "next/navigation";
 
 export default function AuthPage() {
+  const router = useRouter();
+
   const [isLogin, setIsLogin] = useState(true);
   const [role, setRole] = useState("student");
 
@@ -24,16 +27,35 @@ export default function AuthPage() {
 
     const { name, email, password } = form;
 
+    // ================= LOGIN =================
     if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) return alert(error.message);
 
-      window.location.href = "/dashboard";
-    } else {
+      const user = data.user;
+      if (!user) return;
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError) return alert("Error fetching profile");
+
+      if (profile.role === "mentor") {
+        router.push("/dashboard/mentor");
+      } else {
+        router.push("/dashboard/student");
+      }
+    }
+
+    // ================= SIGNUP =================
+    else {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -41,9 +63,8 @@ export default function AuthPage() {
 
       if (error) return alert(error.message);
 
-      // ✅ Insert role into profiles table
       if (data.user) {
-        await supabase.from("profiles").insert([
+        const { error: insertError } = await supabase.from("profiles").insert([
           {
             id: data.user.id,
             name,
@@ -51,6 +72,11 @@ export default function AuthPage() {
             email,
           },
         ]);
+
+        if (insertError) {
+          console.log(insertError);
+          return alert("Error saving user profile");
+        }
       }
 
       alert("Signup successful! Now login.");
@@ -60,7 +86,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
-
+      
       {/* LEFT */}
       <div className="hidden md:flex w-1/2 text-white flex-col justify-center items-center p-10">
         <h1 className="text-5xl font-bold mb-4">MentorConnect</h1>
@@ -71,7 +97,6 @@ export default function AuthPage() {
 
       {/* RIGHT */}
       <div className="flex w-full md:w-1/2 items-center justify-center p-6">
-
         <div className="bg-white/10 backdrop-blur-lg p-8 rounded-2xl shadow-2xl w-[380px] border border-white/20">
 
           {/* Toggle */}
@@ -161,6 +186,7 @@ export default function AuthPage() {
               {isLogin ? "Sign Up" : "Login"}
             </span>
           </p>
+
         </div>
       </div>
     </div>
