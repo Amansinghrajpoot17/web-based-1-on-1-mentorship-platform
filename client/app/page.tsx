@@ -32,6 +32,7 @@ export default function AuthPage() {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        
       });
 
       if (error) return alert(error.message);
