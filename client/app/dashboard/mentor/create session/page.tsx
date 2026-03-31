@@ -21,7 +21,7 @@ export default function CreateSession(){
    if(!user){
       return alert("please login to create a session");
    }
-   const {error}= await supabase.from("session").insert([{
+   const {error}= await supabase.from("sessions").insert([{
      mentor_id:user.id,
     ...form,
    },]);

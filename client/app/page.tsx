@@ -7,7 +7,7 @@ export default function AuthPage() {
   const router = useRouter();
 
   const [isLogin, setIsLogin] = useState(true);
-  const [role, setRole] = useState("student");
+  const [role, setRole] = useState("");
 
   const [form, setForm] = useState({
     name: "",
@@ -22,69 +22,67 @@ export default function AuthPage() {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    const { name, email, password } = form;
+  const { name, email, password } = form;
 
-    // ================= LOGIN =================
-    if (isLogin) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-        
-      });
+  // ================= LOGIN =================
+  if (isLogin) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      if (error) return alert(error.message);
+    if (error) return alert(error.message);
 
-      const user = data.user;
-      if (!user) return;
+    const user = data.user;
+    if (!user) return;
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
+    // ✅ Create profile if not exists
+    const { error: upsertError } = await supabase.from("profiles").upsert({
+      id: user.id,
+      name: name || "User",
+      email: user.email,
+      role: role || "student",
+    });
 
-      if (profileError) return alert("Error fetching profile");
-
-      if (profile.role === "mentor") {
-        router.push("/dashboard/mentor");
-      } else {
-        router.push("/dashboard/student");
-      }
+    if (upsertError) {
+      console.log(upsertError);
+      return alert("Profile error");
     }
 
-    // ================= SIGNUP =================
-    else {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+    // ✅ Fetch role safely
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
 
-      if (error) return alert(error.message);
+    if (profileError) return alert("Error fetching profile");
 
-      if (data.user) {
-        const { error: insertError } = await supabase.from("profiles").insert([
-          {
-            id: data.user.id,
-            name,
-            role,
-            email,
-          },
-        ]);
-
-        if (insertError) {
-          console.log(insertError);
-          return alert("Error saving user profile");
-        }
-      }
-
-      alert("Signup successful! Now login.");
-      setIsLogin(true);
+    // ✅ Redirect
+    if (profile?.role === "mentor") {
+      router.push("/dashboard/mentor");
+    } else {
+      router.push("/dashboard/student");
     }
-  };
+  }
 
+  // ================= SIGNUP =================
+  else {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) return alert(error.message);
+
+    // ❌ DO NOT insert profile here
+    alert("Signup successful! Please login.");
+    setIsLogin(true);
+  }
+};
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
       
