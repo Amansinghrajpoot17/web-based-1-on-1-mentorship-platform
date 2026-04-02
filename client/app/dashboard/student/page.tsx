@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useRouter } from "next/navigation";
+import {v4 as uuidv4} from "uuid";
 
 export default function StudentDashboard() {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -79,16 +80,10 @@ export default function StudentDashboard() {
               Booked ✅
             </button>
           ) : (
-            <><button onClick={() => bookSession(session)}>
+            <><button className="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow" onClick={() => bookSession(session)}>
                 Book Session
               </button><button onClick={handlelogout}
-              style={{
-    backgroundColor: "red",
-    color: "white",
-    padding: "8px 12px",
-    border: "none",
-    cursor: "pointer"
-  }}>
+              className="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 border-b-4 border-blue-700 hover:border-blue-500 rounded">
                   Logout
                 </button></>
 

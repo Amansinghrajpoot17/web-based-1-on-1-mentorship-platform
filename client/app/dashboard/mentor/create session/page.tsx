@@ -3,12 +3,15 @@ import { useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useRouter } from "next/navigation";
 
+   
 export default function CreateSession(){
+
  const [form, setform]= useState({
     title:"",
     description:"",
     date:"",
     time:"",
+    
  });
  const router= useRouter();
  const handleChange=(e:any)=>{
