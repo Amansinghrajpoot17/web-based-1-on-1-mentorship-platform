@@ -12,9 +12,11 @@ export default function MentorDashboard() {
   })
   const router = useRouter()
   const [sessions, setSessions] = useState<any[]>([])
+  const [bookings, setBookings] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchSessions()
+    fetchSessions(),
+    fetchBookings()
   }, [])
 
   const fetchSessions = async () => {
@@ -31,6 +33,17 @@ export default function MentorDashboard() {
       setSessions(data || [])
     }
   }
+  const fetchBookings = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data } = await supabase
+    .from("booking")
+    .select("*")
+    .eq("mentor_id", user.id);
+
+  if (data) setBookings(data);
+};
 
   const handleCreate = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -46,7 +59,6 @@ export default function MentorDashboard() {
         date: form.date,
         time: form.time,
         mentor_id: user.id,
-        room_id: crypto.randomUUID(),
         status:"available"
       })
     if (error) {
@@ -137,21 +149,28 @@ export default function MentorDashboard() {
                 </p>
 
                 <div className="mt-3 flex gap-2">
-                 
                   <span className={`inline-block mt-2 px-3 py-1 text-sm rounded-full ${session.status === "available" 
                         ? "bg-green-100 text-green-700" 
                         : "bg-red-100 text-red-600"}`}>
                     {session.status === "available" ? "Available" : "Unavailable"}
                   </span>
                 </div>
-                {session.status === "available" && (
-                  <button
-                    onClick={() => router.push(`/room/${session.room_id}`)}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                  >
-                    Join Session
-                  </button>
-                )}
+
+                {(() => {
+                  const sessionBooking = bookings.find(
+                    (b) => String(b.session_id) === String(session.id)
+                  )
+
+                  return sessionBooking ? (
+                    <button
+                      onClick={() => router.push(`/room/${sessionBooking.room_id}`)}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                    >
+                      Join Session
+                    </button>
+                  ) : null
+                })()}
+
               </div>
             ))
           ) : (

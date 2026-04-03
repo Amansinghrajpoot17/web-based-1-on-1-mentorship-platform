@@ -22,7 +22,10 @@ export default function StudentDashboard() {
         .from("sessions")
         .select("*");
 
-      if (sessionData) setSessions(sessionData);
+      if (sessionData)  setSessions(sessionData);
+      console.log("sessions", sessionData);
+      
+      
 
       // Bookings with room_id
       const { data: bookingData } = await supabase
@@ -32,6 +35,8 @@ export default function StudentDashboard() {
 
       if (bookingData) {
         setBookedSessions(bookingData);
+        console.log("bookedsessions", bookingData);
+        
       }
     };
 
