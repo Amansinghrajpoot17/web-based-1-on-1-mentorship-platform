@@ -16,10 +16,19 @@ export default function RoomPage() {
     const newSocket = io(
       "https://humble-funicular-jjg4q95xx4q5c5g65-5000.app.github.dev",
       {
-        transports: ["websocket"],
+        path:"/socket.io",
+        transports: ["polling","websocket"],
+        secure: true
       }
     );
-
+ newSocket.on("connect",()=>{
+  console.log("connected", newSocket.id);
+  
+ });
+ newSocket.on("connect_error",(err)=>{
+  console.log("connect error", err.message);
+  
+ })
     setSocket(newSocket);
 
     return () => {
@@ -29,18 +38,24 @@ export default function RoomPage() {
 
   useEffect(() => {
     if (!socket || !roomId) return;
+     socket.on("connect",()=>{
+          socket.emit("join-room", roomId);
 
-    socket.emit("join-room", roomId);
+     })
 
-    socket.on("receive-message", (msg: string) => {
-      setMessages((prev) => [...prev, msg]);
-    });
+   socket.on("receive-message", (data) => {
+  setMessages((prev) => [
+    ...prev,
+    `${data.sender}: ${data.message}`,
+  ]);
+});
 
     socket.on("user-joined", () => {
       setMessages((prev) => [...prev, "👤 Someone joined"]);
     });
 
     return () => {
+      socket.off("connect");
       socket.off("receive-message");
       socket.off("user-joined");
     };

@@ -1,9 +1,9 @@
-const { createServer } = require("http");
-const { Server } = require("socket.io");
+const { createServer } =require("http");
+const { Server } =require ("socket.io");
 
-const httpServer = createServer((req, res) => {
-  res.writeHead(200);
-  res.end("Socket server running");
+const httpServer = createServer((req, res)=>{
+  res.writeHead(200, {"Content-Type": "text/plain"});
+  res.end("Socket server is running");
 });
 
 const io = new Server(httpServer, {
@@ -21,7 +21,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send-message", ({ roomId, message }) => {
-    io.to(roomId).emit("receive-message", message);
+socket.on("receive-message", (msg) => {
+    });
     console.log("Joined room", roomId);
     
   });
@@ -29,4 +30,4 @@ io.on("connection", (socket) => {
 
 httpServer.listen(5000, "0.0.0.0", () => {
   console.log("Socket server running on port 5000");
-});
+}); 

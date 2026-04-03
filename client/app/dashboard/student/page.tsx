@@ -10,7 +10,6 @@ export default function StudentDashboard() {
   const [joinRoomId, setJoinRoomId] = useState("");
 
   const router = useRouter();
-  const roomId=crypto.randomUUID();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -48,45 +47,44 @@ export default function StudentDashboard() {
   };
 
   // ✅ BOOK SESSION
-  const bookSession = async (session: any) => {
-    setLoadingId(session.id);
+ const bookSession = async (session: any) => {
+  setLoadingId(session.id);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
 
-    if (isBooked(session.id)) {
-      alert("Already booked ⚠️");
-      setLoadingId(null);
-      return;
-    }
-
-    const roomId = crypto.randomUUID();  // 🔥 generate room id
-
-    const { error } = await supabase.from("booking").insert([
-      {
-        student_id: user.id,
-        session_id: session.id,
-        mentor_id: session.mentor_id,
-        status: "booked",
-        room_id: roomId,
-      },
-    ]);
-
-    if (error) {
-      if (error.code === "23505") {
-        alert("Already booked ⚠️");
-      } else {
-        alert("Booking failed ❌");
-      }
-    } else {
-      setBookedSessions((prev) => [
-        ...prev,
-        { session_id: session.id, room_id: roomId },
-      ]);
-    }
-
+  if (isBooked(session.id)) {
+    alert("Already booked ⚠️");
     setLoadingId(null);
-  };
+    return;
+  }
+
+  const { error } = await supabase.from("booking").insert([
+    {
+      student_id: user.id,
+      session_id: session.id,
+      mentor_id: session.mentor_id,
+      status: "booked",
+      room_id: session.room_id, // ✅ reuse session room
+    },
+  ]);
+
+  if (error) {
+    if (error.code === "23505") {
+      alert("Already booked ⚠️");
+    } else {
+      alert("Booking failed ❌");
+    }
+  } else {
+    setBookedSessions((prev) => [
+      ...prev,
+      { session_id: session.id, room_id: session.room_id },
+    ]);
+  }
+
+  setLoadingId(null);
+};
+  
 
   // ✅ JOIN SESSION
   const joinSession = (roomId: string) => {
