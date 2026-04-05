@@ -4,6 +4,14 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/app/lib/supabase"
 import { useRouter } from "next/navigation"
 
+interface Message {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
+}
+
 export default function MentorDashboard() {
   const [form, setForm] = useState({
     title: "",
@@ -13,11 +21,31 @@ export default function MentorDashboard() {
   const router = useRouter()
   const [sessions, setSessions] = useState<any[]>([])
   const [bookings, setBookings] = useState<any[]>([]);
+  const [messagesByRoom, setMessagesByRoom] = useState<Record<string, Message[]>>({});
+
 
   useEffect(() => {
-    fetchSessions(),
-    fetchBookings()
-  }, [])
+    fetchSessions();
+    fetchBookings();
+  }, []);
+
+  const fetchMessages = async (roomId: string) => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.error('Fetch messages error:', error);
+    } else {
+      setMessagesByRoom(prev => ({
+        ...prev,
+        [roomId]: data || []
+      }));
+    }
+  };
 
   const fetchSessions = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -31,6 +59,10 @@ export default function MentorDashboard() {
       console.error("Error fetching sessions:", error)
     } else {
       setSessions(data || [])
+      // Fetch messages for each session (roomId = session.id)
+      data?.forEach((session: any) => {
+        fetchMessages(session.id);
+      });
     }
   }
   const fetchBookings = async () => {
@@ -73,6 +105,34 @@ export default function MentorDashboard() {
     await supabase.auth.signOut()
     router.push("/")
   }
+
+  // Realtime messages for sessions
+  useEffect(() => {
+    sessions.forEach((session: any) => {
+      const roomId = session.id;
+      const channel = supabase.channel(`realtime:mentor-room-${roomId}`);
+
+      channel
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `room_id=eq.${roomId}`
+          },
+          (payload) => {
+            console.log('New message:', payload.new);
+            fetchMessages(roomId);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    });
+  }, [sessions]);
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -156,20 +216,34 @@ export default function MentorDashboard() {
                   </span>
                 </div>
 
-                {(() => {
-                  const sessionBooking = bookings.find(
-                    (b) => String(b.session_id) === String(session.id)
-                  )
+                {session.status === "available" ? (
+                  <button
+                    onClick={() => router.push(`/room/${session.id}`)}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                  >
+                    Join Session
+                  </button>
+                ) : null}
 
-                  return sessionBooking ? (
-                    <button
-                      onClick={() => router.push(`/room/${sessionBooking.room_id}`)}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                    >
-                      Join Session
-                    </button>
-                  ) : null
-                })()}
+                {/* Recent Messages Preview */}
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <h4 className="font-medium text-sm mb-2 text-gray-800">Recent Messages ({(messagesByRoom[session.id] || []).length})</h4>
+                  <div className="max-h-24 overflow-y-auto space-y-1 text-xs">
+                    {(messagesByRoom[session.id] || []).slice(0, 3).map((msg: Message) => (
+                      <div key={msg.id} className="flex items-start gap-2">
+                        <span className="font-bold text-gray-600 w-20 truncate">
+                          {msg.sender_id.slice(0, 8)}...
+                        </span>
+                        <span className="flex-1 text-gray-900 truncate pr-2" title={msg.message}>
+                          {msg.message.length > 40 ? `${msg.message.slice(0, 40)}...` : msg.message}
+                        </span>
+                      </div>
+                    ))}
+                    {(messagesByRoom[session.id] || []).length === 0 && (
+                      <p className="text-gray-500 text-xs italic">No messages</p>
+                    )}
+                  </div>
+                </div>
 
               </div>
             ))
@@ -177,6 +251,25 @@ export default function MentorDashboard() {
             <p className="text-gray-500">No sessions created yet.</p>
           )}
         </div>
+
+        {/* Bookings Section */}
+        {bookings.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Booked Sessions</h2>
+            {bookings.map((booking: any) => (
+              <div key={booking.id} className="border rounded-xl p-4 shadow-sm bg-white mb-3">
+                <p className="text-sm text-gray-500">Session ID: {booking.session_id}</p>
+                <p className="text-sm text-gray-500">Room ID: {booking.room_id}</p>
+                <button
+                  onClick={() => router.push(`/room/${booking.room_id}`)}
+                  className="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded text-sm"
+                >
+                  Join Booking Room
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

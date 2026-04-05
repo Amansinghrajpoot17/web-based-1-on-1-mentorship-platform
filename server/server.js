@@ -1,5 +1,10 @@
 const { createServer } = require("http");
 const { Server } = require("socket.io");
+const { createClient } = require('@supabase/supabase-js');
+
+const supabaseUrl = "https://wadohqsksjkivdvjkikf.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhZG9ocXNrc2praXZkdmpraWtmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDI4MTAyMiwiZXhwIjoyMDg5ODU3MDIyfQ.3AhHDdIH2SGdUbElUHplQ2HdyD6mwP-2kMVfWYrLEbA";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const httpServer = createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
@@ -41,13 +46,25 @@ io.on("connection", (socket) => {
   // =========================
   // CHAT
   // =========================
-  socket.on("send-message", ({ roomId, message }) => {
+  socket.on("send-message", async ({ roomId, message }) => {
       console.log("MSG:", message);
 
-    socket.to(roomId).emit("receive-message", {
-      sender: socket.id,
-      message,
-    });
+      // Persist to DB
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          room_id: roomId,
+          sender_id: socket.id,
+          content: message
+        });
+
+      if (error) console.error('DB insert error:', error);
+
+      // Broadcast
+      io.to(roomId).emit("receive-message", {
+        sender: socket.id,
+        message,
+      });
   });
 
   // =========================

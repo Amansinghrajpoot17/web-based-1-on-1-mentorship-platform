@@ -3,7 +3,17 @@
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { supabase } from "@/app/lib/supabase";
 import Editor from "@monaco-editor/react";
+import { Content } from "next/font/google";
+
+interface MessageDB {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+}
 
 export default function RoomPage() {
   const { id: roomIdParam } = useParams() as { id?: string };
@@ -17,6 +27,8 @@ export default function RoomPage() {
   const [messages, setMessages] = useState<string[]>([]);
   const[code,setcode]=useState("// Write your code here...")
   const [language,setlanguage]=useState("javascript");
+
+  const [dbMessages, setDbMessages] = useState<MessageDB[]>([]);
 
   useEffect(() => {
     const newSocket = io(
@@ -68,8 +80,6 @@ export default function RoomPage() {
         }
       };
 
-      // Join room ONCE
-      newSocket.emit("join-room", roomId);
 
       // 🔥 When other user joins → create offer
       newSocket.on("user-joined", async () => {
@@ -100,15 +110,37 @@ export default function RoomPage() {
       });
     };
 
+    // Load past messages from DB
+    const loadHistory = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Load history error:', error);
+      } else {
+        setDbMessages(data || []);
+        // Convert to string format for display
+        const historyStrings = (data || []).map(msg => `${msg.sender_id.slice(0,6)}... : ${msg.content}`);
+        setMessages(historyStrings);
+      }
+    };
+
+    loadHistory();
+
     newSocket.on("connect", () => {
       console.log("connected", newSocket.id);
+            newSocket.emit("join-room", roomId);
+start();
     });
 
     newSocket.on("connect_error", (err) => {
       console.log("connect error", err.message);
     });
 
-    start();
+    
 
     return () => {
       newSocket.disconnect();
@@ -150,7 +182,7 @@ socket.on("code-change", (data)=>{
       message,
     });
 
-    setMessages((prev) => [...prev, `You: ${message}`]);
+
     setMessage("");
   };
   const handleEditorChange = (value: string | undefined) => {
@@ -166,74 +198,84 @@ socket.on("code-change", (data)=>{
     });
   }
 };
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">
-        Room: {roomId}
-      </h1>
+ return (
+  <div className="h-screen bg-gray-900 text-white p-3 flex gap-3">
 
-      <div className="border h-80 overflow-y-auto p-3 mb-4 bg-gray-100">
+    {/* LEFT SIDE */}
+    <div className="flex-1 flex flex-col gap-3">
+
+      {/* EDITOR */}
+      <div className="bg-gray-800 rounded-xl p-3 flex-1 flex flex-col">
+        
+        <div className="flex justify-between mb-2">
+          <h2 className="font-semibold">💻 Code Editor</h2>
+
+          <select
+            value={language}
+            onChange={(e) => {
+              const newLang = e.target.value;
+              setlanguage(newLang);
+              socket?.emit("code-change", {
+                roomId,
+                code,
+                language: newLang,
+              });
+            }}
+            className="text-black px-2 py-1 rounded"
+          >
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+            <option value="cpp">C++</option>
+          </select>
+        </div>
+
+        <div className="flex-1">
+          <Editor
+            height="100%"
+            language={language}
+            theme="vs-dark"
+            value={code}
+            onChange={handleEditorChange}
+          />
+        </div>
+      </div>
+
+      {/* VIDEO */}
+      <div className="flex gap-3 h-40">
+        <video ref={localvideoRef} autoPlay muted className="w-1/2 rounded-xl object-cover" />
+        <video ref={remotevideoRef} autoPlay className="w-1/2 rounded-xl object-cover" />
+      </div>
+
+    </div>
+
+    {/* RIGHT CHAT */}
+    <div className="w-80 bg-gray-800 rounded-xl p-3 flex flex-col">
+      <h2 className="font-semibold mb-2">💬 Chat</h2>
+
+      <div className="flex-1 overflow-y-auto bg-gray-900 p-2 rounded mb-2 text-sm">
         {messages.map((msg, i) => (
           <p key={i}>{msg}</p>
         ))}
       </div>
-       <video ref={localvideoRef} autoPlay muted className="w-1/2 border" />
-      <video ref={remotevideoRef} autoPlay className="w-1/2 border" />
-      <div className="mt-6">
-  <h2 className="text-lg font-bold mb-2">💻 Live Code Editor</h2>
-<div className="mb-2">
-  <label className="mr-2 font-semibold">Language:</label>
 
-  <select
-  value={language}
-  onChange={(e) => {
-    const newLang = e.target.value;
-    setlanguage(newLang);
-
-    socket?.emit("code-change", {
-      roomId,
-      code,
-      language: newLang,
-    });
-  }}
-    className="border p-1"
-  >
-    <option value="javascript">JavaScript</option>
-    <option value="typescript">TypeScript</option>
-    <option value="python">Python</option>
-    <option value="java">Java</option>
-    <option value="cpp">C++</option>
-    <option value="c">C</option>
-    <option value="json">JSON</option>
-    <option value="html">HTML</option>
-    <option value="css">CSS</option>
-  </select>
-</div>
-
-  <Editor
-    height="400px"
-    defaultLanguage="javascript"
-    language={language}
-    theme="vs-dark"
-    value={code}
-    onChange={handleEditorChange}
-  />
-</div>
-
+      {/* 🔥 FIX HERE */}
       <div className="flex gap-2">
         <input
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          className="border p-2 flex-1"
+          className="flex-1 p-2 rounded text-black"
           placeholder="Type message..."
         />
         <button
           onClick={sendMessage}
-          className="bg-blue-500 text-white px-4"
+          className="bg-blue-500 px-4 rounded"
         >
           Send
         </button>
       </div>
     </div>
-  );
-}
+
+  </div>
+);}

@@ -3,13 +3,40 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useRouter } from "next/navigation";
 
+interface Message {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
+}
+
 export default function StudentDashboard() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [bookedSessions, setBookedSessions] = useState<any[]>([]);
+  const [messagesByRoom, setMessagesByRoom] = useState<Record<string, Message[]>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [joinRoomId, setJoinRoomId] = useState("");
 
   const router = useRouter();
+
+  const fetchMessages = async (roomId: string) => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.error('Fetch messages error:', error);
+    } else {
+      setMessagesByRoom(prev => ({
+        ...prev,
+        [roomId]: data || []
+      }));
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -23,8 +50,6 @@ export default function StudentDashboard() {
 
       if (sessionData)  setSessions(sessionData);
       console.log("sessions", sessionData);
-      
-      
 
       // Bookings with room_id
       const { data: bookingData } = await supabase
@@ -35,7 +60,10 @@ export default function StudentDashboard() {
       if (bookingData) {
         setBookedSessions(bookingData);
         console.log("bookedsessions", bookingData);
-        
+        // Fetch messages for each booking
+        bookingData.forEach((booking: any) => {
+          fetchMessages(booking.room_id);
+        });
       }
     };
 
@@ -90,6 +118,37 @@ export default function StudentDashboard() {
   const joinSession = (roomId: string) => {
     router.push(`/room/${roomId}`);
   };
+
+  // Realtime messages
+  useEffect(() => {
+    bookedSessions.forEach((booking: any) => {
+      const roomId = booking.room_id;
+      const channel = supabase.channel(`realtime:room-${roomId}`);
+
+      channel
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `room_id=eq.${roomId}`
+          },
+          (payload) => {
+            console.log('New message:', payload.new);
+            fetchMessages(roomId); // Refetch to update
+          }
+        )
+        .subscribe((status) => {
+          console.log(`Room ${roomId} subscribed:`, status);
+        });
+
+      // Cleanup
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    });
+  }, [bookedSessions]);
 
   // ✅ MANUAL JOIN
   const handleManualJoin = () => {
@@ -146,7 +205,7 @@ export default function StudentDashboard() {
               <h2 className="text-xl font-semibold">{session.title}</h2>
               <p className="text-gray-600 mb-3">🕒 {session.time}</p>
 
-              {booking ? (
+{booking ? (
                 <div className="space-y-3">
                   <div className="text-green-600 font-semibold">
           Booked ✅
@@ -161,6 +220,26 @@ export default function StudentDashboard() {
                   <p className="text-sm text-gray-500 break-all">
                     Room ID: {booking.room_id}
                   </p>
+
+                  {/* Recent Messages Preview */}
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                    <h4 className="font-medium text-sm mb-2 text-gray-800">Recent Messages</h4>
+                    <div className="max-h-24 overflow-y-auto space-y-1 text-xs">
+                      {(messagesByRoom[booking.room_id] || []).slice(0, 3).map((msg: Message) => (
+                        <div key={msg.id} className="flex items-start gap-2">
+                          <span className="font-bold text-gray-600 w-16 truncate">
+                            {msg.sender_id.slice(0, 8)}...
+                          </span>
+                          <span className="flex-1 text-gray-900 truncate" title={msg.message}>
+                            {msg.message.length > 50 ? `${msg.message.slice(0, 50)}...` : msg.message}
+                          </span>
+                        </div>
+                      ))}
+                      {(messagesByRoom[booking.room_id] || []).length === 0 && (
+                        <p className="text-gray-500 text-xs italic">No messages yet</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <button
