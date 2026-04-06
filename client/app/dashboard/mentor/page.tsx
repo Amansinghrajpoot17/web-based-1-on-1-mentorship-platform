@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect,useRef ,useState } from "react"
 import { supabase } from "@/app/lib/supabase"
 import { useRouter } from "next/navigation"
+import { RealtimeChannel } from "@supabase/supabase-js"
 
 interface Message {
   id: string;
@@ -21,6 +22,7 @@ export default function MentorDashboard() {
   const router = useRouter()
   const [sessions, setSessions] = useState<any[]>([])
   const [bookings, setBookings] = useState<any[]>([]);
+  const channelsRef = useRef<Map<string, RealtimeChannel>>(new Map())
   const [messagesByRoom, setMessagesByRoom] = useState<Record<string, Message[]>>({});
 
 
@@ -108,31 +110,65 @@ export default function MentorDashboard() {
 
   // Realtime messages for sessions
   useEffect(() => {
-    sessions.forEach((session: any) => {
-      const roomId = session.id;
-      const channel = supabase.channel(`realtime:mentor-room-${roomId}`);
+   // Clean up old channels
+    channelsRef.current.forEach((channel) => {
+      supabase.removeChannel(channel)
+    })
+    channelsRef.current.clear()
 
-      channel
+    sessions.forEach((session: any) => {
+      const roomId = session.id
+      
+      // Create unique channel name
+      const channelName = `messages:room_id=eq.${roomId}`
+      
+      const channel = supabase
+        .channel(channelName, {
+          config: {
+            broadcast: { self: false },
+            presence: { key: roomId },
+          },
+        })
         .on(
           'postgres_changes',
           {
             event: 'INSERT',
             schema: 'public',
             table: 'messages',
-            filter: `room_id=eq.${roomId}`
+            filter: `room_id=eq.${roomId}`,
           },
           (payload) => {
-            console.log('New message:', payload.new);
-            fetchMessages(roomId);
+            console.log('New message received:', payload)
+            // Add new message instead of refetching all
+            setMessagesByRoom((prev) => ({
+              ...prev,
+              [roomId]: [
+                ...(prev[roomId] || []),
+                payload.new as Message,
+              ],
+            }))
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`Channel ${roomId} status:`, status)
+          if (status === 'CHANNEL_ERROR') {
+            console.error(`Failed to subscribe to room ${roomId}`)
+            console.error('Check: 1. Realtime enabled on messages table')
+            console.error('Check: 2. RLS policies allow SELECT')
+            console.error('Check: 3. Room ID is valid UUID')
+          }
+        })
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    });
-  }, [sessions]);
+      channelsRef.current.set(roomId, channel)
+    })
+
+    // Cleanup on unmount
+    return () => {
+      channelsRef.current.forEach((channel) => {
+        supabase.removeChannel(channel)
+      })
+    }
+  }, [sessions])
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -150,7 +186,6 @@ export default function MentorDashboard() {
             Logout
           </button>
         </div>
-
         {/* Create Session */}
         <div className="bg-gray-50 p-4 rounded-xl shadow-sm mb-6">
           <h2 className="text-lg font-semibold mb-3 text-gray-700">

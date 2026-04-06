@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect,useRef ,useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { useRouter } from "next/navigation";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
 interface Message {
   id: string;
@@ -15,6 +16,7 @@ export default function StudentDashboard() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [bookedSessions, setBookedSessions] = useState<any[]>([]);
   const [messagesByRoom, setMessagesByRoom] = useState<Record<string, Message[]>>({});
+  const channelsRef = useRef<Map<string, RealtimeChannel>>(new Map());
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [joinRoomId, setJoinRoomId] = useState("");
 
